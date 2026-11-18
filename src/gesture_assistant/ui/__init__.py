@@ -1,0 +1,2 @@
+"""Interfejs graficzny GestureAssistant."""
+

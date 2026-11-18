@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "mode": "Auto",
+  "camera": {
+    "index": 0,
+    "fps_limit": 30,
+    "width": 1280,
+    "height": 720
+  },
+  "preview": {
+    "enabled": true,
+    "landmarks": true
+  },
+  "feedback": {
+    "enabled": true
+  },
+  "thresholds": {
+    "gesture_hold_ms": 700,
+    "action_cooldown_ms": 2000,
+    "motion_cooldown_ms": 1500,
+    "max_tracking_gap_ms": 250,
+    "max_event_age_ms": 250,
+    "min_confidence": 0.7
+  },
+  "safety": {
+    "paused": true,
+    "enabled": false,
+    "sleep_computer": false,
+    "confirmed_destructive": []
+  },
+  "allowed_actions": [],
+  "bindings": {},
+  "targets": {
+    "applications": {},
+    "urls": {},
+    "shortcuts": {}
+  },
+  "execution": {
+    "dry_run": true
+  },
+  "profiles": {
+    "Teams": {
+      "FIST": "teams.toggle_mute",
+      "POINTING_UP": "teams.toggle_raise_hand",
+      "PINCH": "teams.toggle_camera"
+    },
+    "Browser": {
+      "FIST": "browser.new_tab",
+      "THUMBS_UP": "browser.refresh_page",
+      "SWIPE_LEFT": "browser.previous_tab",
+      "SWIPE_RIGHT": "browser.next_tab",
+      "POINTING_UP": "browser.go_back"
+    },
+    "Presentation": {
+      "SWIPE_RIGHT": "presentation.next_slide",
+      "SWIPE_LEFT": "presentation.previous_slide",
+      "THUMBS_UP": "presentation.start_presentation",
+      "FIST": "presentation.end_presentation"
+    },
+    "Media": {
+      "FIST": "media.play_pause",
+      "POINTING_UP": "media.stop",
+      "THUMBS_UP": "media.volume_up",
+      "THUMBS_DOWN": "media.volume_down",
+      "SWIPE_RIGHT": "media.next_track",
+      "SWIPE_LEFT": "media.previous_track"
+    },
+    "System": {
+      "FIST": "system.toggle_mute",
+      "PINCH": "system.take_screenshot",
+      "SWIPE_LEFT": "system.switch_virtual_desktop",
+      "SWIPE_RIGHT": "system.switch_virtual_desktop"
+    }
+  }
+}
+

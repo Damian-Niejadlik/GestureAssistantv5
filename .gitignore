@@ -1,0 +1,17 @@
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+.ruff_cache/
+build/
+dist/
+*.db
+*.sqlite
+models/
+logs/
+.idea/
+config.json
+backup*/
+*.egg-info/
+*.patch
+*.part
