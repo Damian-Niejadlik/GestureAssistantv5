@@ -68,7 +68,9 @@ class Workspace(QWidget):
         sidebar, nav = card()
         sidebar.setFixedWidth(216)
         layout.setSpacing(16)
-        nav.addWidget(label("GestureAssistant", "title"))
+        brand = label("Gesture Assistant", "brand")
+        brand.setWordWrap(True)
+        nav.addWidget(brand)
         self.pages = QStackedWidget()
         self.nav = []
         for index, text in enumerate(("Start", "Podgląd i sterowanie", "Historia", "Ustawienia", "Kalibracja gestów")):
@@ -81,7 +83,7 @@ class Workspace(QWidget):
         nav.addStretch()
         self.source = label("Źródło: kamera nieaktywna")
         nav.addWidget(self.source)
-        nav.addWidget(label("0.1.0 · Etap 4"))
+
         help_button = QPushButton("Pomoc")
         help_button.clicked.connect(self.help)
         nav.addWidget(help_button)

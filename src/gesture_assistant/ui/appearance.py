@@ -23,12 +23,6 @@ class AppearancePage(QWidget):
         self.window = window
         self.settings = QSettings("GestureAssistant", "GestureAssistant")
         layout = QFormLayout(self)
-        self.mode = QComboBox()
-        self.mode.addItem("Ciemny", "dark")
-        self.mode.addItem("Jasny", "light")
-        current = self.settings.value("appearance/mode", "dark", type=str)
-        self.mode.setCurrentIndex(max(0, self.mode.findData(current)))
-        layout.addRow("Motyw", self.mode)
         self.colors = {}
         for key, title in (("ACCENT", "Główny kolor akcentu"), ("MAGENTA", "Kolor wyboru i fokusu")):
             button = QPushButton()
@@ -41,14 +35,12 @@ class AppearancePage(QWidget):
         reset = QPushButton("Przywróć domyślne kolory tego motywu")
         reset.clicked.connect(self.reset)
         layout.addRow(reset)
-        self.mode.currentIndexChanged.connect(self.apply)
         self.apply()
 
     def palette_values(self):
-        mode = self.mode.currentData()
-        colors = dict(tokens.LIGHT if mode == "light" else tokens.DARK)
+        colors = dict(tokens.DARK)
         for key in self.colors:
-            saved = self.settings.value(f"appearance/{mode}/{key}", "", type=str)
+            saved = self.settings.value(f"appearance/dark/{key}", "", type=str)
             if re.fullmatch(r"#[0-9a-fA-F]{6}", saved) and self.readable(saved, colors):
                 colors[key] = saved
         return colors
@@ -65,16 +57,15 @@ class AppearancePage(QWidget):
         if not self.readable(color.name(), colors):
             self.note.setText("Wybierz bardziej kontrastowy kolor dla tego motywu.")
             return
-        self.settings.setValue(f"appearance/{self.mode.currentData()}/{key}", color.name())
+        self.settings.setValue(f"appearance/dark/{key}", color.name())
         self.apply()
 
     def reset(self):
         for key in self.colors:
-            self.settings.remove(f"appearance/{self.mode.currentData()}/{key}")
+            self.settings.remove(f"appearance/dark/{key}")
         self.apply()
 
     def apply(self, _index=None):
-        self.settings.setValue("appearance/mode", self.mode.currentData())
         colors = self.palette_values()
         for key, value in colors.items():
             setattr(tokens, key, value)

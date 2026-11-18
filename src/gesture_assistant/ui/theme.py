@@ -26,6 +26,11 @@ def get_stylesheet() -> str:
     }}
     QLabel, QCheckBox, QGroupBox {{ color: {t.TEXT}; }}
     QLabel[role="title"] {{ font-size: 26px; font-weight: 700; }}
+        QLabel[role="brand"] {{
+        color: {t.ACCENT};
+        font-size: 20px;
+        font-weight: 700;
+    }}
     QLabel[role="secondary"] {{ color: {t.SECONDARY}; }}
     QLabel[role="error"] {{ color: {t.ERROR}; }}
     QLabel[role="status"] {{ background: {t.RAISED}; color: {t.ACCENT};
