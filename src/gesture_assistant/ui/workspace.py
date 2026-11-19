@@ -2,12 +2,12 @@ import csv
 from datetime import datetime
 from pathlib import Path
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QSettings, Qt
 from PySide6.QtGui import QColor, QIcon, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (
     QComboBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QFrame,
     QGridLayout, QHBoxLayout, QLabel, QListWidget, QMenu, QMessageBox, QPushButton, QScrollArea,
-    QSpinBox, QStackedWidget, QSystemTrayIcon, QTabWidget, QVBoxLayout, QWidget,
+    QCheckBox, QLineEdit, QSpinBox, QStackedWidget, QSystemTrayIcon, QTabWidget, QVBoxLayout, QWidget,
 )
 
 from src.gesture_assistant.ui import tokens
@@ -43,6 +43,11 @@ def scroll(widget):
 
 
 def app_icon():
+    icon_path = Path(__file__).resolve().parents[3] / "gesture_assistant.ico"
+    if icon_path.is_file():
+        icon = QIcon(str(icon_path))
+        if not icon.isNull():
+            return icon
     image = QPixmap(32, 32)
     image.fill(QColor(tokens.BACKGROUND))
     painter = QPainter(image)
@@ -123,6 +128,7 @@ class Workspace(QWidget):
                                  "Potwierdzenie akcji i bezpieczeństwo")
         container, options = card()
         options.addWidget(label("Ustawienia", "title"))
+        self.settings_tabs.addTab(self._build_screenshot_settings(), "Zrzuty ekranu")
         self.settings_tabs.addTab(scroll(AppearancePage(window)), "Wygląd")
         options.addWidget(self.settings_tabs, 1)
         self.pages.addWidget(container)
@@ -322,6 +328,52 @@ class Workspace(QWidget):
             note.setText("Zapisano. Parametry obrazu obowiązują od następnej sesji kamery.")
         else:
             note.setText("Nie zapisano ustawień kamery.")
+
+    def _build_screenshot_settings(self):
+        page = QWidget()
+        layout = QFormLayout(page)
+        self._screen_settings = QSettings("GestureAssistant", "GestureAssistant")
+        default = str(Path.home() / "GestureAssistant" / "Screenshots")
+        self._screen_folder = QLineEdit(self._screen_settings.value("screenshots/folder", default, type=str))
+        self._screen_clipboard = QCheckBox("Kopiuj obraz do schowka (Ctrl+V)")
+        self._screen_clipboard.setChecked(self._screen_settings.value("screenshots/clipboard", False, type=bool))
+        browse = QPushButton("Wybierz folder…")
+        browse.clicked.connect(self._choose_screenshot_folder)
+        save = QPushButton("Zapisz ustawienia zrzutów")
+        save.clicked.connect(self._save_screenshot_settings)
+        layout.addRow("Folder zapisu PNG", self._screen_folder)
+        layout.addRow(browse)
+        layout.addRow(self._screen_clipboard)
+        layout.addRow(save)
+        folder = Path(self._screen_folder.text().strip()).expanduser()
+        if not folder.is_absolute():
+            folder = Path(default)
+            self._screen_folder.setText(default)
+        self.window.screenshot_backend.configure_screenshot(
+            folder, self._screen_clipboard.isChecked(), self.window.winId()
+        )
+        return page
+
+    def _choose_screenshot_folder(self):
+        folder = QFileDialog.getExistingDirectory(self, "Folder zapisu zrzutów", self._screen_folder.text())
+        if folder:
+            self._screen_folder.setText(folder)
+
+    def _save_screenshot_settings(self):
+        try:
+            folder = Path(self._screen_folder.text().strip()).expanduser()
+            if not folder.is_absolute():
+                raise ValueError("Podaj pełną ścieżkę do folderu.")
+            folder.mkdir(parents=True, exist_ok=True)
+        except (OSError, ValueError, RuntimeError) as exc:
+            QMessageBox.warning(self, "Zrzuty ekranu", str(exc))
+            return
+        self._screen_settings.setValue("screenshots/folder", str(folder))
+        self._screen_settings.setValue("screenshots/clipboard", self._screen_clipboard.isChecked())
+        self._screen_settings.sync()
+        self.window.screenshot_backend.configure_screenshot(
+            folder, self._screen_clipboard.isChecked(), self.window.winId()
+        )
 
     def _build_confirmation_settings(self):
         page, layout = card()

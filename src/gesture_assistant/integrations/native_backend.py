@@ -1,6 +1,7 @@
 """Lazy native Windows operations. Importing this module performs no action."""
 
 import ctypes
+import io
 import os
 import uuid
 from datetime import datetime
@@ -91,6 +92,12 @@ def send_virtual_keys(keys, guard):
 
 
 class WindowsBackend:
+    def __init__(self):
+        self._screenshot_options = (Path.home() / "GestureAssistant" / "Screenshots", False, 0)
+
+    def configure_screenshot(self, folder, copy_image, owner_hwnd):
+        self._screenshot_options = (Path(folder), bool(copy_image), int(owner_hwnd))
+
     def hotkey(self, value, guard, allow_reserved=False):
         keys = validate_shortcut(value, allow_reserved)
         vk = {
@@ -205,7 +212,7 @@ class WindowsBackend:
         if os.name != "nt":
             raise OSError("Zrzut ekranu tej integracji wymaga Windows.")
         require_guard(guard)
-        folder = Path.home() / "GestureAssistant" / "Screenshots"
+        folder, copy_image, owner_hwnd = self._screenshot_options
         folder.mkdir(parents=True, exist_ok=True)
         name = datetime.now().strftime("%Y%m%d_%H%M%S_") + uuid.uuid4().hex + ".png"
         destination = folder / name
@@ -215,9 +222,68 @@ class WindowsBackend:
         try:
             require_guard(guard)
             image.save(temporary, format="PNG")
+            require_guard(guard)
             os.replace(temporary, destination)
+            if copy_image:
+                try:
+                    _copy_dib_to_clipboard(image, owner_hwnd, guard)
+                except (OSError, ValueError) as exc:
+                    return f"Zapisano: {destination}; nie skopiowano do schowka: {exc}"
         finally:
             image.close()
             temporary.unlink(missing_ok=True)
         return destination
+
+
+def _copy_dib_to_clipboard(image, owner_hwnd, guard):
+    from ctypes import wintypes
+
+    if not owner_hwnd:
+        raise ValueError("Brak okna właściciela schowka.")
+    with image.convert("RGB") as rgb, io.BytesIO() as buffer:
+        rgb.save(buffer, format="BMP")
+        dib = buffer.getvalue()[14:]  # CF_DIB: nagłówek DIB i piksele, bez nagłówka pliku BMP.
+
+    user = windows_dll("user32")
+    kernel = windows_dll("kernel32")
+    for dll, name, argtypes, restype in (
+        (kernel, "GlobalAlloc", (wintypes.UINT, ctypes.c_size_t), wintypes.HGLOBAL),
+        (kernel, "GlobalLock", (wintypes.HGLOBAL,), ctypes.c_void_p),
+        (kernel, "GlobalUnlock", (wintypes.HGLOBAL,), wintypes.BOOL),
+        (kernel, "GlobalFree", (wintypes.HGLOBAL,), wintypes.HGLOBAL),
+        (user, "OpenClipboard", (wintypes.HWND,), wintypes.BOOL),
+        (user, "EmptyClipboard", (), wintypes.BOOL),
+        (user, "CloseClipboard", (), wintypes.BOOL),
+        (user, "SetClipboardData", (wintypes.UINT, wintypes.HANDLE), wintypes.HANDLE),
+    ):
+        function = getattr(dll, name)
+        function.argtypes = argtypes
+        function.restype = restype
+
+    data = kernel.GlobalAlloc(0x0002, len(dib))  # GMEM_MOVEABLE
+    if not data:
+        raise ctypes.WinError(ctypes.get_last_error())
+    try:
+        address = kernel.GlobalLock(data)
+        if not address:
+            raise ctypes.WinError(ctypes.get_last_error())
+        try:
+            ctypes.memmove(address, dib, len(dib))
+        finally:
+            kernel.GlobalUnlock(data)
+        require_guard(guard)
+        if not user.OpenClipboard(owner_hwnd):
+            raise ctypes.WinError(ctypes.get_last_error())
+        try:
+            require_guard(guard)
+            if not user.EmptyClipboard():
+                raise ctypes.WinError(ctypes.get_last_error())
+            if not user.SetClipboardData(8, data):  # CF_DIB
+                raise ctypes.WinError(ctypes.get_last_error())
+            data = None  # Od teraz pamięcią zarządza Windows.
+        finally:
+            user.CloseClipboard()
+    finally:
+        if data:
+            kernel.GlobalFree(data)
 

@@ -15,3 +15,5 @@ backup*/
 *.egg-info/
 *.patch
 *.part
+
+/dist-onefile/

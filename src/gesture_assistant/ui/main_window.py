@@ -28,6 +28,7 @@ from src.gesture_assistant.core.action_runtime import ActionRuntime
 from src.gesture_assistant.core.config_manager import ConfigManager, defaults, project_config_path
 from src.gesture_assistant.core.context_detector import MODES
 from src.gesture_assistant.integrations import ACTION_CATALOG
+from src.gesture_assistant.integrations.native_backend import WindowsBackend
 from src.gesture_assistant.integrations.browser_actions import (
     DEFAULT_SHORTCUTS as BROWSER_SHORTCUTS,
 )
@@ -160,7 +161,8 @@ class MainWindow(QMainWindow):
 
 
         self._config["safety"]["paused"] = True
-        self._runtime = ActionRuntime(self._config)
+        self.screenshot_backend = WindowsBackend()
+        self._runtime = ActionRuntime(self._config, backend=self.screenshot_backend)
         self._closing = False
         self._failed = False
 

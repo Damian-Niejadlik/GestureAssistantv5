@@ -18,7 +18,8 @@ logger = logging.getLogger(__name__)
 class ActionRuntime:
     """One explicit lifecycle-managed action consumer; no work on GUI thread."""
 
-    def __init__(self, config=None, detector=None, clock=clock_ms):
+    def __init__(self, config=None, detector=None, clock=clock_ms, backend=None):
+        self._backend = backend
         self.safety = SafetyManager(defaults() if config is None else config, clock)
         self.detector = detector or ContextDetector(clock=clock)
         self.queue = ActionQueue()
@@ -33,7 +34,7 @@ class ActionRuntime:
             self.safety,
             self.detector,
             dry_run=config["execution"]["dry_run"],
-            dispatcher=NativeDispatcher(config),
+            dispatcher=NativeDispatcher(config, backend=self._backend),
             on_confirmation=self._need_confirmation,
         )
 
@@ -44,7 +45,7 @@ class ActionRuntime:
             self._config = validate_config(config)
             self.safety.update_config(self._config)
             self.executor.dry_run = self._config["execution"]["dry_run"]
-            self.executor.dispatcher = NativeDispatcher(self._config)
+            self.executor.dispatcher = NativeDispatcher(self._config, backend=self._backend)
 
     def active_gesture_signals(self):
         config = self.safety.config
