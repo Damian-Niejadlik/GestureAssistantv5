@@ -1,9 +1,12 @@
 from collections import deque
+from statistics import median
 
 import numpy as np
 
 from src.gesture_assistant.core.debounce import CooldownManager
 from src.gesture_assistant.gestures.definitions import Gesture, Motion, MotionConfig
+
+from src.gesture_assistant.gestures.personal import MOVES, valid_row
 
 CONFLICTING_STATIC_GESTURES = {
     Gesture.FIST,
@@ -21,6 +24,7 @@ class MotionClassifier:
         self.config = config or MotionConfig()
         self.cooldowns = CooldownManager()
         self._last = None
+        self.samples = {}
         self.reset()
 
     def reset(self):
@@ -48,13 +52,33 @@ class MotionClassifier:
             elif np.linalg.norm(point - last_p) > c.max_step:
                 self.reset()
         self._history.append((timestamp_ms, point, gesture))
-        while self._history and timestamp_ms - self._history[0][0] > c.max_duration_ms:
+        limits = {}
+        for signal in MOVES:
+            rows = self.samples.get(signal.value, ())
+            if len(rows) == 10 and all(valid_row(signal, row) for row in rows):
+                limits[signal] = (max(0.08, median(row[0] for row in rows) * 0.8),
+                                  min(3000, max(200, median(row[1] for row in rows) * 1.25)))
+        window = max([c.max_duration_ms, *(duration for _, duration in limits.values())])
+        while self._history and timestamp_ms - self._history[0][0] > window:
             self._history.popleft()
         if len(self._history) < c.min_samples:
             return Motion.NONE
         if not any(g == Gesture.OPEN_PALM for _, _, g in self._history):
             return Motion.NONE
-        points = np.array([p for _, p, _ in self._history])
+        for duration in sorted({c.max_duration_ms, *(d for _, d in limits.values())}):
+            motion = self._classify_window(timestamp_ms, duration, limits)
+            if motion != Motion.NONE:
+                self.cooldowns.start("motion", timestamp_ms, c.cooldown_ms)
+                self.reset()
+                return motion
+        return Motion.NONE
+
+    def _classify_window(self, now, duration, limits):
+        c = self.config
+        recent = [(p, g) for t, p, g in self._history if now - t <= duration]
+        if len(recent) < c.min_samples or not any(g == Gesture.OPEN_PALM for _, g in recent):
+            return Motion.NONE
+        points = np.array([p for p, _ in recent])
         start_idx = 0
         while start_idx < len(points) - c.min_samples:
             if np.linalg.norm(points[start_idx + 1] - points[0]) > 0.04:
@@ -65,8 +89,6 @@ class MotionClassifier:
             return Motion.NONE
         delta = active[-1] - active[0]
         axis = int(np.argmax(np.abs(delta)))
-        if abs(delta[axis]) < c.distance:
-            return Motion.NONE
         if abs(delta[axis]) < c.dominance * abs(delta[1 - axis]):
             return Motion.NONE
         length = np.linalg.norm(np.diff(active, axis=0), axis=1).sum()
@@ -77,7 +99,8 @@ class MotionClassifier:
             if axis == 0
             else (Motion.SWIPE_UP if delta[1] < 0 else Motion.SWIPE_DOWN)
         )
-        self.cooldowns.start("motion", timestamp_ms, c.cooldown_ms)
-        self.reset()
+        distance, allowed_duration = limits.get(motion, (c.distance, c.max_duration_ms))
+        if duration != allowed_duration or abs(delta[axis]) < distance:
+            return Motion.NONE
         return motion
 

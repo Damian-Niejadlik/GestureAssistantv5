@@ -943,7 +943,7 @@ class MainWindow(QMainWindow):
             camera_settings=self._config["camera"],
             orientation=orientation,
             samples=calibration.load(source, orientation)
-            if calibration.enabled.isChecked() and not self._demo else None,
+            if calibration.enabled.isChecked() and not calibration.capture_session else None,
         )
         worker.apply_config(self._config)
         worker.error.connect(self._on_error)

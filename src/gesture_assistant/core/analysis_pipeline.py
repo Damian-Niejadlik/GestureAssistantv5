@@ -9,7 +9,7 @@ from src.gesture_assistant.gestures.definitions import (
     MotionConfig,
     Quality,
 )
-from src.gesture_assistant.gestures.personal import match
+from src.gesture_assistant.gestures.personal import match, match_pair
 from src.gesture_assistant.gestures.two_hands import classify_pair
 from src.gesture_assistant.gestures.quality import inspect_hand
 from src.gesture_assistant.gestures.smoothing import LandmarkSmoother
@@ -61,6 +61,7 @@ class AnalysisPipeline:
         hand = result.hands[0] if len(result.hands) == 1 else None
         quality, _, _ = inspect_hand(hand, width, height, self.config)
         pair = Gesture.UNKNOWN
+        calibrated = False
         if len(result.hands) > 1:
             candidates = [item for item in result.hands
                           if inspect_hand(item, width, height, self.config)[0] == Quality.VALID]
@@ -71,6 +72,9 @@ class AnalysisPipeline:
                 labels = tuple(self.gestures.classifier.classify(item, width, height).gesture
                                for item in candidates)
                 pair = classify_pair(*candidates, labels, width, height)
+                if pair == Gesture.UNKNOWN and self.samples:
+                    pair = match_pair(candidates, width, height, self.samples)
+                    calibrated = pair != Gesture.UNKNOWN
                 if pair == Gesture.UNKNOWN:
                     signals = self.active_signals()
                     selected = [item for item, gesture in zip(candidates, labels)
@@ -82,7 +86,6 @@ class AnalysisPipeline:
                         hand, quality = selected[0], Quality.VALID
             elif len(result.hands) == 2 and len(candidates) == 1:
                 hand, quality = candidates[0], Quality.VALID
-        calibrated = False
         if pair != Gesture.UNKNOWN:
             quality = Quality.VALID
         side = "pair" if pair != Gesture.UNKNOWN else hand.handedness if hand else None
@@ -150,6 +153,7 @@ class AnalysisPipeline:
             else:
                 gate = Gesture.UNKNOWN
 
+            self.motions.classifier.samples = self.samples
             motion = self.motions.update(hand, gate, now)
             confidence = (
                 0.0
